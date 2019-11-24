@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 #by synod2 
 from collections import OrderedDict
+import geoip2.database
 import dpkt, dpkt.dns
 import json 
 import datetime
@@ -8,7 +9,9 @@ import socket
 import os 
 import sys 
 
+
 dirname = "packets/"
+reader = geoip2.database.Reader('geoip/GeoLite2-Country.mmdb')
 
 class App_db:
 	def __init__(self,appname):
@@ -53,6 +56,7 @@ for (path,dir,files) in os.walk(dirname) :
 				with open(open_name,'rb') as f:
 					pcap = dpkt.pcap.Reader(f)
 					addr = []	#make addr list. 
+					geolist = []
 					var = 100
 		
 					for timestamp, buf in pcap:
@@ -85,24 +89,38 @@ for (path,dir,files) in os.walk(dirname) :
 				
 				
 				print (appname+" -----in file  "+filename+"------ size : "+str(os.path.getsize(open_name)))
-				print ("time:"+str(dpkt.radiotap.datarate(pcap)))
+				
 				old_db = App_db(appname)
+				
+				for i in ex_addr : 
+					response = reader.country(i)
+					geolist.append(response.country.name)
+				
 				if(old_db.iplist != ""):
 					print("ip addr similarity : "+str(round(ipsim(old_db.iplist,ex_addr),2))+"%")
-			
-				#old_db.iplist.append(ex_addr)
+					print("country similarity : "+str(round(ipsim(old_db.geoIP,geolist),2))+"%")
+					
+				if(round(ipsim(old_db.iplist,ex_addr),2) < 50) :
+					print("----------------ip change warning! ------------")
+					
 				#print ex_addr
 				for i in ex_addr : 
+					response = reader.country(i)
+					old_db.geoIP.append(response.country.name)
 					old_db.iplist.append(i)
 				#	print (i+ " is : " +str(addr.count(i)))
+
 				old_db.iplist = list(set(old_db.iplist))
-			#	print(old_db.iplist)
+				old_db.geoIP = list(set(old_db.geoIP))
+				#print(old_db.geoIP)
 				old_db.save()
 				f.close()
 			except : 
 				print ("file open error "+open_name)
 				
-test = App_db("chrome")
+
+#response = reader.country('128.101.101.101')
+#print(response.country.name)
 # test.iplist.append("7.6.6.6")
 # test.iplist = list(set(test.iplist))
 # print(test.iplist)
